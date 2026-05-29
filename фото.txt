@@ -1,0 +1,73 @@
+1. В БД (SSMS) — поле с путём к картинке
+Допустим, таблица Товары, поле Изображение типа nvarchar(255).
+Храним там имя файла или относительный путь (например, "product1.jpg").
+Папка с картинками лежит рядом с exe (например, папка Images).
+
+2. На форме — DataGridView, привязанный к данным
+Загружаем данные из БД в DataTable и привязываем к DataGridView.
+
+csharp
+string connectionString = "ваша строка подключения";
+string query = "SELECT Id, Название, Цена, Изображение FROM Товары";
+SqlDataAdapter adapter = new SqlDataAdapter(query, connectionString);
+DataTable table = new DataTable();
+adapter.Fill(table);
+dataGridView1.DataSource = table;
+3. Добавляем колонку с картинкой (если её нет)
+Можно создать DataGridViewImageColumn вручную или преобразовать существующую текстовую колонку.
+
+Способ (рекомендуемый): после привязки скрываем текстовую колонку Изображение и добавляем новую колонку с картинкой.
+
+csharp
+// После привязки:
+dataGridView1.Columns["Изображение"].Visible = false; // скрываем текстовую
+
+DataGridViewImageColumn imageColumn = new DataGridViewImageColumn();
+imageColumn.Name = "Картинка";
+imageColumn.HeaderText = "Фото";
+imageColumn.ImageLayout = DataGridViewImageCellLayout.Zoom; // масштабировать
+dataGridView1.Columns.Add(imageColumn);
+4. Заполняем колонку картинками в событии CellFormatting
+csharp
+private void dataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+{
+    // Проверяем, что это наша колонка с картинкой
+    if (dataGridView1.Columns[e.ColumnIndex].Name == "Картинка")
+    {
+        // Получаем путь к картинке из скрытой колонки "Изображение"
+        string imagePath = dataGridView1.Rows[e.RowIndex].Cells["Изображение"].Value?.ToString();
+        
+        if (!string.IsNullOrEmpty(imagePath))
+        {
+            string fullPath = Path.Combine(Application.StartupPath, "Images", imagePath);
+            if (File.Exists(fullPath))
+            {
+                e.Value = Image.FromFile(fullPath);
+            }
+            else
+            {
+                e.Value = null; // или картинка-заглушка
+            }
+        }
+        else
+        {
+            e.Value = null;
+        }
+    }
+}
+Важно: Image.FromFile блокирует файл. Если будут проблемы с повторной загрузкой, можно так (чуть сложнее, но на демоэкзамене обычно сойдёт и простой вариант). Чтобы не блокировало, используйте:
+
+csharp
+using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read))
+{
+    e.Value = Image.FromStream(fs);
+}
+5. Назначьте событие в конструкторе формы или в Form_Load
+csharp
+public Form1()
+{
+    InitializeComponent();
+    dataGridView1.CellFormatting += dataGridView1_CellFormatting;
+}
+Всё.
+При загрузке формы в DataGridView будет отображаться колонка с фотографиями из папки Images согласно путям, хранящимся в БД.
